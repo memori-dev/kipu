@@ -1,0 +1,15 @@
+.{
+    .name = .kipu,
+    .version = "0.0.0",
+    .minimum_zig_version = "0.14.1",
+
+    .fingerprint = 0x8535a3f43bba129a, // Changing this has security and trust implications.
+
+    .dependencies = .{},
+
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
