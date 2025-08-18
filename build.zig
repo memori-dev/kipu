@@ -22,7 +22,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(lib);
 
     const tests = b.addTest(.{.root_module = lib_mod});
-    const tests_run = b.addRunArtifact(lib_unit_tests);
+    const tests_run = b.addRunArtifact(tests);
     const tests_step = b.step("test", "Run tests");
     tests_step.dependOn(&tests_run.step);
     install_step.dependOn(tests_step);

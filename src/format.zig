@@ -12,11 +12,13 @@ const assert = std.debug.assert;
 // TODO struct to hold the relevant metadata
 
 pub const Format = enum {
+	const Self = @This();
+
+	unknown,
 	empty,
 
 	pgp_public,
 	pgp_private,
-	gpg,
 	crt,
 	bash,
 	pwsh,
@@ -110,6 +112,41 @@ pub const Format = enum {
 
 	firefoxCacheMorgueFinal,
 	firefoxJsonLZ4,
+
+	pub fn parse(f: std.fs.File, size: u64) !Self {
+		if (size == 0) return Self.empty;
+
+		var matchedFormat: Self = .unknown;
+		var buf: [Signature.maxLen]u8 = undefined;
+
+		for (fileOffsetsSigs) |fos| {
+			if (size < fos.offsetBytes) continue;
+
+			const offset: u64 = if (fos.offsetIsFromEnd) size - fos.offsetBytes else fos.offsetBytes;
+			try f.seekTo(offset);
+			const n = try f.reader().read(&buf);
+
+			for (fos.sigs) |sig| {
+				if (n < sig.len) continue;
+
+				// ignore has all useful bits as a 1 and ignored bits as 0
+				// sig must also have ignored bits as 0
+				var i: usize = 0;
+				while (i < sig.len and buf[i] & sig.ignore[i] == sig.sig[i]) : (i += 1) {}
+
+				// check every u8 matched
+				if (i != sig.len) continue;
+
+				// match found
+				// assert multiple matches should not happen
+			   // `or matchedSignature == sig.Format` is used to handle iso9660 since all of the offsets match
+				assert(matchedFormat == .unknown or matchedFormat == sig.format);
+				matchedFormat = sig.format;
+			}
+		}
+
+		return matchedFormat;
+	}
 };
 
 const Signature = struct {
@@ -131,6 +168,7 @@ const Signature = struct {
 		if (ignoreHex) |v| assert(v.len == hex.len);
 
 		var sig: [Signature.maxLen]u8 = undefined;
+		@setEvalBranchQuota(3800);
 		_ = std.fmt.hexToBytes(&sig, hex) catch unreachable;
 
 		var ignore: [Signature.maxLen]u8 = @splat(255);
@@ -182,9 +220,7 @@ const fileOffsetsSigs = [_]struct{
 
 			Signature.init(Format.nib, "4E494241726368697665", null), // NIBArchive
 
-			// https://www.ietf.org/archive/id/draft-bre-openpgp-samples-01.html#name-alices-ed25519-samples
 			// TODO -----BEGIN RSA PRIVATE KEY-----
-			Signature.init(Format.gpg,         "01677067",                                                                   null), // .gpg
 			Signature.init(Format.pgp_private, "2D2D2D2D2D424547494E205047502050524956415445204B455920424C4F434B2D2D2D2D2D", null), // -----BEGIN PGP PRIVATE KEY BLOCK-----
 			Signature.init(Format.pgp_public,  "2D2D2D2D2D424547494E20504750205055424C4943204B455920424C4F434B2D2D2D2D2D",   null), // -----BEGIN PGP PUBLIC KEY BLOCK-----
 			Signature.init(Format.crt,         "2D2D2D2D2D424547494E2043455254494649434154452D2D2D2D2D",                     null), // -----BEGIN CERTIFICATE-----
